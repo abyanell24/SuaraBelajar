@@ -1,17 +1,18 @@
-import { useState, type FormEvent } from 'react'
-import { Search, Users, Plus, Globe, Mic, MessageSquare } from 'lucide-react'
+import { useState, useEffect, type FormEvent } from 'react'
+import { Search, Users, Plus, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { authService, roomService, profileService } from '@/lib/supabaseService'
 
 const LANGUAGES = [
-  { id: 'en', name: 'English', flag: '🇬🇧', count: 225 },
-  { id: 'id', name: 'Indonesian', flag: '🇮🇩', count: 58 },
-  { id: 'jp', name: 'Japanese', flag: '🇯🇵', count: 12 },
-  { id: 'kr', name: 'Korean', flag: '🇰🇷', count: 8 },
-  { id: 'cn', name: 'Chinese', flag: '🇨🇳', count: 15 },
-  { id: 'es', name: 'Spanish', flag: '🇪🇸', count: 9 },
+  { id: 'en', name: 'English', flag: '🇬🇧' },
+  { id: 'id', name: 'Indonesian', flag: '🇮🇩' },
+  { id: 'jp', name: 'Japanese', flag: '🇯🇵' },
+  { id: 'kr', name: 'Korean', flag: '🇰🇷' },
+  { id: 'cn', name: 'Chinese', flag: '🇨🇳' },
+  { id: 'es', name: 'Spanish', flag: '🇪🇸' },
 ]
 
 const LEVELS = ['All', 'Beginner', 'Intermediate', 'Advanced']
@@ -21,64 +22,152 @@ interface Room {
   name: string
   language: string
   level: string
-  participants: number
-  topic: string
+  description: string
+  created_by: string
+  nickname?: string
+  participant_count?: number
 }
-
-const ACTIVE_ROOMS: Room[] = [
-  { id: '1', name: 'English Free Talk', language: 'en', level: 'All', participants: 5, topic: 'Free conversation' },
-  { id: '2', name: 'Bahasa Indonesia', language: 'id', level: 'Beginner', participants: 3, topic: 'Latihan bahasa' },
-  { id: '3', name: 'Japan Coffee Chat', language: 'jp', level: 'Intermediate', participants: 4, topic: 'Casual talk' },
-  { id: '4', name: 'K-Drama Discussion', language: 'kr', level: 'All', participants: 2, topic: 'Korean dramas' },
-  { id: '5', name: 'Chinese Learners', language: 'cn', level: 'Beginner', participants: 6, topic: 'Mandarin practice' },
-]
 
 export default function Landing() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('en')
   const [selectedLevel, setSelectedLevel] = useState('All')
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const navigate = useNavigate()
 
-  const filteredRooms = ACTIVE_ROOMS.filter(room => {
+  useEffect(() => {
+    checkAuth()
+    fetchRooms()
+  }, [selectedLanguage, selectedLevel])
+
+  const checkAuth = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser()
+      setUser(currentUser)
+      if (currentUser) {
+        const userProfile = await profileService.getProfile(currentUser.id)
+        setProfile(userProfile)
+      }
+    } catch (err) {
+      setUser(null)
+    }
+  }
+
+  const fetchRooms = async () => {
+    setLoading(true)
+    try {
+      const language = selectedLanguage === 'en' ? undefined : selectedLanguage
+      const data = await roomService.getRooms(language)
+      setRooms(data || [])
+    } catch (err) {
+      console.error('Failed to fetch rooms:', err)
+      setRooms([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredRooms = rooms.filter(room => {
     const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                       room.topic.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesLanguage = selectedLanguage === 'all' || room.language === selectedLanguage
+                       room.description.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesLanguage = selectedLanguage === 'en' || room.language === selectedLanguage
     const matchesLevel = selectedLevel === 'All' || room.level === selectedLevel
     return matchesSearch && matchesLanguage && matchesLevel
   })
 
-  const createRoom = () => {
-    const roomId = Math.random().toString(36).substring(2, 10)
-    navigate(`/room/${roomId}`)
-    toast.success('Room created!')
+  const handleCreateRoom = async () => {
+    if (!user) {
+      toast.error('Please login to create a room')
+      navigate('/login')
+      return
+    }
+
+    const roomName = `${selectedLanguage.toUpperCase()} Free Talk`
+    const roomDescription = 'Join us to practice speaking!'
+
+    try {
+      const newRoom = await roomService.createRoom(
+        roomName,
+        roomDescription,
+        selectedLanguage,
+        selectedLevel === 'All' ? 'Beginner' : selectedLevel,
+        user.id
+      )
+      toast.success('Room created!')
+      navigate(`/room/${newRoom.id}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create room')
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut()
+      setUser(null)
+      setProfile(null)
+      toast.success('Signed out')
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800">
-      {}
       <header className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-              <Mic className="w-6 h-6 text-white" />
+              <Users className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">SuaraBelajar</h1>
               <p className="text-xs text-slate-400">Language Practice Community</p>
             </div>
           </div>
-          <Button 
-            onClick={createRoom}
-            className="bg-blue-500 hover:bg-blue-600"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Room
-          </Button>
+
+          {user ? (
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={() => navigate('/profile')} 
+                className="flex items-center space-x-2 text-sm text-slate-300 hover:text-white"
+              >
+                {profile?.avatar_url ? (
+                  <img 
+                    src={profile.avatar_url} 
+                    alt="Avatar" 
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="w-4 h-4" />
+                )}
+                <span>{profile?.nickname || user.email?.split('@')[0]}</span>
+              </button>
+              <Button onClick={handleSignOut} variant="ghost" size="sm">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" onClick={() => navigate('/login')}>
+                Login
+              </Button>
+              <Button onClick={() => navigate('/signup')}>
+                Daftar
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {}
+        <Button onClick={handleCreateRoom} className="bg-blue-500 hover:bg-blue-600 w-full">
+          <Plus className="w-4 h-4 mr-2" />
+          Create Room
+        </Button>
+
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
@@ -90,7 +179,6 @@ export default function Landing() {
           />
         </div>
 
-        {}
         <div className="flex flex-wrap gap-2">
           {LANGUAGES.map(lang => (
             <button
@@ -104,12 +192,10 @@ export default function Landing() {
             >
               <span>{lang.flag}</span>
               <span className="text-sm font-medium">{lang.name}</span>
-              <span className="text-xs opacity-70">({lang.count})</span>
             </button>
           ))}
         </div>
 
-        {}
         <div className="flex gap-2">
           {LEVELS.map(level => (
             <button
@@ -126,14 +212,17 @@ export default function Landing() {
           ))}
         </div>
 
-        {}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Active Rooms</h2>
             <span className="text-sm text-slate-400">{filteredRooms.length} rooms</span>
           </div>
 
-          {filteredRooms.length === 0 ? (
+          {loading ? (
+            <Card className="p-8 bg-white/5 border-white/10 text-center">
+              <p className="text-slate-400">Loading...</p>
+            </Card>
+          ) : filteredRooms.length === 0 ? (
             <Card className="p-8 bg-white/5 border-white/10 text-center">
               <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <p className="text-slate-400">No active rooms found</p>
@@ -160,11 +249,11 @@ export default function Landing() {
                         {room.level}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-400">{room.topic}</p>
+                    <p className="text-sm text-slate-400">{room.description}</p>
                   </div>
                   <div className="flex items-center space-x-1 text-slate-400">
                     <Users className="w-4 h-4" />
-                    <span className="text-sm">{room.participants}</span>
+                    <span className="text-sm">{room.participant_count || 0}</span>
                   </div>
                 </div>
               </button>
@@ -173,14 +262,13 @@ export default function Landing() {
         </div>
       </main>
 
-      {}
       <footer className="border-t border-white/10 py-6 mt-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <p className="text-slate-400 text-sm">
-            🎤 Practice speaking. Make friends. Learn together.
+            Practice speaking. Make friends. Learn together.
           </p>
           <p className="text-slate-500 text-xs mt-2">
-            No signup required • Free forever • Browser-based
+            Free forever • Browser-based
           </p>
         </div>
       </footer>

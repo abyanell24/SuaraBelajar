@@ -23,6 +23,8 @@ class VoiceChatService {
   private roomId: string = ''
   private participantId: string = ''
   private nickname: string = ''
+  private muted: boolean = false
+  private localStream: MediaStream | null = null
   
   private onConnectionStateCb?: Callback<ConnectionState>
   private onParticipantsCb?: Callback<RoomParticipant[]>
@@ -32,10 +34,14 @@ class VoiceChatService {
   async joinRoom(roomId: string, nickname: string): Promise<void> {
     this.roomId = roomId
     this.nickname = nickname
+    this.muted = false
     
     this.onConnectionStateCb?.('connecting')
     
     try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      console.log('Microphone access granted')
+      
       this.client = new SignalingClient()
       
       this.client.onConnected(() => {
@@ -70,15 +76,27 @@ class VoiceChatService {
   }
 
   async leaveRoom(): Promise<void> {
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop())
+      this.localStream = null
+    }
     if (this.client) {
       this.client.leaveRoom()
       this.client.disconnect()
+      this.client = null
     }
     this.onConnectionStateCb?.('disconnected')
   }
 
   async toggleMute(): Promise<boolean> {
-    return false
+    this.muted = !this.muted
+    if (this.localStream) {
+      this.localStream.getAudioTracks().forEach(track => {
+        track.enabled = !this.muted
+      })
+    }
+    console.log('Muted:', this.muted)
+    return this.muted
   }
 
   sendChatMessage(content: string): void {

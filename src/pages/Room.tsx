@@ -14,28 +14,102 @@ import {
   Settings,
   ArrowLeft,
   UserPlus,
-  Loader2
+  Loader2,
+  Edit2,
+  Users
 } from 'lucide-react'
 import { useParams, Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { voiceChatService, type ChatMessage, type ConnectionState, type RoomParticipant } from '@/lib/VoiceChatService'
+import { roomService, messageService, authService, profileService } from '@/lib/supabaseService'
+
+interface RoomDetails {
+  id: string
+  name: string
+  description: string
+  language: string
+  level: string
+  created_by: string
+  nickname?: string
+}
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>()
   
+  const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null)
   const [isMuted, setIsMuted] = useState(false)
   const [showChat, setShowChat] = useState(true)
+  const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isInCall, setIsInCall] = useState(false)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [isLoading, setIsLoading] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [savingRoom, setSavingRoom] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    authService.getCurrentUser()
+      .then(setCurrentUser)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (roomId) {
+      messageService.getMessages(roomId)
+        .then(async (msgs) => {
+          if (msgs && msgs.length > 0) {
+            const senderIds = [...new Set(msgs.map((m: any) => m.sender_id))]
+            const senderNames: Record<string, string> = {}
+            
+            for (const id of senderIds) {
+              try {
+                const profile = await profileService.getProfile(id)
+                senderNames[id] = profile?.nickname || 'User'
+              } catch {
+                senderNames[id] = 'User'
+              }
+            }
+            
+            const formatted = msgs.map((m: any) => ({
+              id: m.id,
+              senderId: m.sender_id,
+              senderName: senderNames[m.sender_id] || 'User',
+              content: m.content,
+              timestamp: new Date(m.created_at)
+            }))
+            setMessages(formatted)
+          }
+        })
+        .catch(err => console.error('Failed to load messages:', err))
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    if (roomId) {
+      roomService.getRoom(roomId)
+        .then((room) => {
+          console.log('Room data:', room)
+          if (room) {
+            roomService.getRoomCreatorName(room.created_by).then((nickname) => {
+              setRoomDetails({ ...room, nickname: nickname || 'Anonymous' })
+            })
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load room:', err)
+        })
+    }
+  }, [roomId])
 
   useEffect(() => {
     voiceChatService.onConnectionState((state) => {
@@ -81,17 +155,30 @@ export default function Room() {
     toast.info('Left room')
   }
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim()) return
-    voiceChatService.sendChatMessage(newMessage)
-    setMessages([...messages, {
+    
+    const content = newMessage
+    voiceChatService.sendChatMessage(content)
+    
+    const localMsg = {
       id: Date.now().toString(),
       senderId: 'me',
       senderName: 'You',
-      content: newMessage,
+      content: content,
       timestamp: new Date()
-    }])
+    }
+    setMessages([...messages, localMsg])
     setNewMessage('')
+    
+    try {
+      const userId = currentUser?.id || 'anonymous'
+      await messageService.sendMessage(roomId || '', userId, content)
+      console.log('Message saved, userId:', userId)
+    } catch (err: any) {
+      console.error('Failed to save message:', err?.message || err)
+      toast.error('Failed to save message')
+    }
   }
 
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -105,7 +192,7 @@ export default function Room() {
 
   return (
     <div className="h-screen flex bg-slate-900">
-      <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col hidden xl:flex">
+      <aside className={`${showParticipants ? 'flex' : 'hidden'} xl:flex w-64 bg-slate-800 border-r border-slate-700 flex-col fixed xl:relative inset-y-0 left-0 z-20`}>
         <div className="p-4 border-b border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-white">Participants</h2>
@@ -151,7 +238,27 @@ export default function Room() {
           ))}
         </div>
 
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-4 border-t border-slate-700 space-y-2">
+          {currentUser?.id === roomDetails?.created_by && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full text-slate-400 hover:text-white hover:bg-slate-700"
+              onClick={async () => {
+                try {
+                  await roomService.updateRoomLastActive(roomId || '')
+                  await messageService.cleanOldMessages(24)
+                  await roomService.deleteInactiveRooms(30)
+                  toast.success(`Room activity updated!`)
+                } catch (err) {
+                  toast.error('Failed')
+                }
+              }}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Clean & Delete Inactive
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="w-full text-slate-400 hover:text-white hover:bg-slate-700">
             <Settings className="w-4 h-4 mr-2" />
             Room Settings
@@ -160,14 +267,70 @@ export default function Room() {
       </aside>
 
       <main className="flex-1 flex flex-col">
-        <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4">
+        <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-2 sm:px-4">
           <div className="flex items-center space-x-3">
             <Link to="/" className="p-2 hover:bg-slate-700 rounded-lg">
               <ArrowLeft className="w-5 h-5 text-slate-400" />
             </Link>
             <div>
-              <h1 className="text-white font-semibold">English Free Talk</h1>
-              <p className="text-xs text-slate-400">Room: {roomId?.slice(0, 8)}...</p>
+              {isEditing ? (
+                <div className="flex items-center space-x-2">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-7 bg-white/10 border-white/20 text-white text-sm"
+                    placeholder="Room name"
+                  />
+                  <Input
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    className="h-7 bg-white/10 border-white/20 text-white text-sm mt-1"
+                    placeholder="Description"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={async () => {
+                      if (!editName.trim()) return
+                      setSavingRoom(true)
+                      try {
+                        await roomService.updateRoom(roomId || '', { 
+                          name: editName.trim(), 
+                          description: editDesc.trim() || null 
+                        })
+                        setRoomDetails({ ...roomDetails!, name: editName.trim(), description: editDesc.trim() || null })
+                        setIsEditing(false)
+                        toast.success('Room updated!')
+                      } catch (err) {
+                        toast.error('Failed to update')
+                      } finally {
+                        setSavingRoom(false)
+                      }
+                    }}
+                    disabled={savingRoom}
+                    className="h-7"
+                  >
+                    {savingRoom ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setIsEditing(false)}
+                    className="h-7 px-2"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <h1 className="text-white font-semibold">{roomDetails?.name || 'Loading...'}</h1>
+                  {roomDetails?.description && (
+                    <p className="text-xs text-slate-400">{roomDetails.description}</p>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    {roomDetails?.language?.toUpperCase()} • {roomDetails?.level} • {roomDetails?.nickname || 'Unknown'}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -179,8 +342,30 @@ export default function Room() {
               {connectionState === 'connected' ? 'Connected' : 
                connectionState === 'connecting' ? 'Connecting...' : 'Not in call'}
             </Badge>
+            {!isEditing && currentUser?.id === roomDetails?.created_by && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setEditName(roomDetails?.name || '')
+                  setEditDesc(roomDetails?.description || '')
+                  setIsEditing(true)
+                }}
+                className="text-slate-400"
+              >
+                <Edit2 className="w-4 h-4" />
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={copyRoomLink} className="border-slate-600 text-slate-300">
               <Copy className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-slate-400 md:hidden"
+              onClick={() => setShowParticipants(!showParticipants)}
+            >
+              <Users className="w-5 h-5" />
             </Button>
             <Button 
               variant="ghost" 
@@ -193,7 +378,7 @@ export default function Room() {
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4">
           {isLoading ? (
             <div className="text-center">
               <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
@@ -249,10 +434,10 @@ export default function Room() {
       </main>
 
       {showChat && (
-        <aside className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col">
+        <aside className="fixed xl:relative right-0 top-0 h-full w-full sm:w-80 bg-slate-800 border-l border-slate-700 flex flex-col z-30">
           <div className="h-14 border-b border-slate-700 flex items-center justify-between px-4">
             <h2 className="font-semibold text-white">Chat</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowChat(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowChat(false)} className="xl:hidden">
               <X className="w-4 h-4 text-slate-400" />
             </Button>
           </div>
