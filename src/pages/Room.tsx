@@ -1,517 +1,283 @@
+import { useState, useEffect, useRef, type KeyboardEvent, type ChangeEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { 
   Mic, 
   MicOff, 
   PhoneOff, 
-  Copy, 
-  Users
+  Phone, 
+  Copy,
+  Send,
+  MessageSquare,
+  X,
+  Settings,
+  ArrowLeft,
+  UserPlus,
+  Loader2
 } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { audioManager } from '@/lib/audio/AudioManager'
-import { WebRTCManager, type SignalData } from '@/lib/webrtc/WebRTCManager'
-import { SignalingClient } from '@/lib/signaling/SignalingClient'
-import { VoiceOrb } from '@/components/VoiceOrb'
 
 interface Participant {
   id: string
   nickname: string
   isMuted: boolean
-  isConnected: boolean
 }
+
+interface ChatMessage {
+  id: string
+  senderId: string
+  senderName: string
+  content: string
+}
+
+const DEMO_PARTICIPANTS: Participant[] = [
+  { id: 'demo1', nickname: 'John 🇺🇸', isMuted: false },
+  { id: 'demo2', nickname: 'Mas印尼', isMuted: false },
+]
+
+const DEMO_MESSAGES: ChatMessage[] = [
+  { id: '1', senderId: 'demo1', senderName: 'John 🇺🇸', content: 'Hello! 👋' },
+  { id: '2', senderId: 'demo2', senderName: 'Mas印尼', content: 'Hi all! Ready to practice?' },
+]
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>()
-  const navigate = useNavigate()
-  const webrtcManagerRef = useRef<WebRTCManager | null>(null)
-  const signalingClientRef = useRef<SignalingClient | null>(null)
-  const [myParticipantId, setMyParticipantId] = useState<string>('')
   
-  const [isConnected, setIsConnected] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [participants, setParticipants] = useState<Participant[]>([])
-  const [nickname, setNickname] = useState('User')
-  const [roomUrl, setRoomUrl] = useState('')
-  const [audioLevel, setAudioLevel] = useState(0)
-
-  // WebRTC callback handlers
-  const handleSignalData = (signalData: SignalData) => {
-    console.log('📡 Sending signal data:', signalData)
-    // Send signal through signaling server
-    if (signalingClientRef.current && signalData.to) {
-      signalingClientRef.current.sendSignal(signalData.to, signalData.signal)
-    }
-  }
-
-  const handleStreamReceived = (peerId: string, stream: MediaStream) => {
-    console.log('📥 Remote stream received from:', peerId)
-    // Remote participant is already added via signaling events
-    // Just log the stream reception
-    audioManager.addRemoteStream(peerId, stream)
-  }
-
-  const handleConnectionStateChange = (peerId: string, state: string) => {
-    console.log(`🔗 Connection state changed for ${peerId}:`, state)
-    setParticipants(prev => 
-      prev.map(p => 
-        p.id === peerId 
-          ? { ...p, isConnected: state === 'connected' }
-          : p
-      )
-    )
-  }
+  const [showChat, setShowChat] = useState(true)
+  const [participants, setParticipants] = useState<Participant[]>(DEMO_PARTICIPANTS)
+  const [messages, setMessages] = useState<ChatMessage[]>(DEMO_MESSAGES)
+  const [newMessage, setNewMessage] = useState('')
+  const [isInCall, setIsInCall] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (roomId) {
-      setRoomUrl(`${window.location.origin}/room/${roomId}`)
-      // Auto-connect when entering room
-      handleConnect()
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
-    // Initialize WebRTC manager and signaling client
-    const initWebRTC = async () => {
-      try {
-        const webrtcManager = new WebRTCManager(
-          audioManager,
-          {}, // Use default config
-          handleSignalData,
-          handleStreamReceived,
-          handleConnectionStateChange
-        )
-        
-        await webrtcManager.initialize()
-        webrtcManagerRef.current = webrtcManager
-        console.log('✅ WebRTC Manager initialized')
-      } catch (error) {
-        console.error('❌ Failed to initialize WebRTC Manager:', error)
-      }
-    }
-
-    const initSignaling = async () => {
-      try {
-        const signalingClient = new SignalingClient()
-        
-        // Set up event handlers
-        signalingClient.onConnected(() => {
-          console.log('✅ Connected to signaling server')
-        })
-
-        signalingClient.onDisconnected(() => {
-          console.log('⚠️ Disconnected from signaling server')
-        })
-
-        signalingClient.onRoomJoined((roomId, participantId) => {
-          console.log(`✅ Joined room ${roomId} as ${participantId}`)
-          setMyParticipantId(participantId)
-          
-          // Add self as participant when successfully joined
-          setParticipants(prev => {
-            // Check if self is already in the list
-            const hasSelf = prev.some(p => p.id === 'self')
-            if (hasSelf) {
-              console.log('⚠️ Self already in participants list')
-              return prev
-            }
-            
-            const newParticipants = [...prev, {
-              id: 'self',
-              nickname: nickname,
-              isMuted: false,
-              isConnected: true
-            }]
-            console.log('👤 Added self to participants. Total:', newParticipants.length)
-            return newParticipants
-          })
-        })
-
-        signalingClient.onParticipantJoined((participant) => {
-          console.log('👥 Participant joined:', participant)
-          setParticipants(prev => {
-            // Check if participant already exists
-            const existing = prev.find(p => p.id === participant.participantId)
-            if (existing) {
-              console.log('⚠️ Participant already exists:', participant.participantId)
-              return prev
-            }
-            
-            const newParticipants = [...prev, {
-              id: participant.participantId,
-              nickname: participant.nickname,
-              isMuted: false,
-              isConnected: false // Will be updated when WebRTC connects
-            }]
-            console.log('👥 Added new participant. Total:', newParticipants.length)
-            return newParticipants
-          })
-          
-          // Create WebRTC connection as initiator
-          if (webrtcManagerRef.current) {
-            webrtcManagerRef.current.createConnection(
-              participant.participantId,
-              true, // We are the initiator for new participants
-              roomId || ''
-            )
-          }
-        })
-
-        signalingClient.onParticipantLeft((participantId) => {
-          console.log('👋 Participant left:', participantId)
-          setParticipants(prev => prev.filter(p => p.id !== participantId))
-          
-          // Close WebRTC connection
-          if (webrtcManagerRef.current) {
-            webrtcManagerRef.current.closeConnection(participantId)
-          }
-        })
-
-        signalingClient.onExistingParticipants((participants) => {
-          console.log('👥 Existing participants:', participants)
-          // Add existing participants and create connections
-          participants.forEach(participant => {
-            setParticipants(prev => {
-              // Check if participant already exists
-              const existing = prev.find(p => p.id === participant.participantId)
-              if (existing) {
-                console.log('⚠️ Existing participant already in list:', participant.participantId)
-                return prev
-              }
-              
-              return [...prev, {
-                id: participant.participantId,
-                nickname: participant.nickname,
-                isMuted: false,
-                isConnected: false
-              }]
-            })
-            
-            // Create WebRTC connection as non-initiator (existing participants initiate)
-            if (webrtcManagerRef.current) {
-              webrtcManagerRef.current.createConnection(
-                participant.participantId,
-                false, // They are the initiator for existing connections
-                roomId || ''
-              )
-            }
-          })
-        })
-
-        signalingClient.onSignalReceived((from, signal) => {
-          console.log('📡 Signal received from:', from)
-          if (webrtcManagerRef.current) {
-            webrtcManagerRef.current.handleSignal({
-              from,
-              to: myParticipantId,
-              signal,
-              callId: roomId || '',
-              type: signal.type || 'unknown'
-            })
-          }
-        })
-
-        signalingClient.onError((error) => {
-          console.error('❌ Signaling error:', error)
-          toast.error(`Signaling error: ${error}`)
-        })
-
-        await signalingClient.connect()
-        signalingClientRef.current = signalingClient
-        console.log('✅ Signaling Client initialized')
-      } catch (error) {
-        console.error('❌ Failed to initialize Signaling Client:', error)
-        toast.error('Failed to connect to signaling server')
-      }
-    }
-
-    initWebRTC()
-    initSignaling()
-
-    // Cleanup on unmount
-    return () => {
-      if (webrtcManagerRef.current) {
-        webrtcManagerRef.current.cleanup()
-        webrtcManagerRef.current = null
-      }
-      if (signalingClientRef.current) {
-        signalingClientRef.current.disconnect()
-        signalingClientRef.current = null
-      }
-    }
-  }, [roomId])
-
-  // Real-time audio level monitoring
-  useEffect(() => {
-    if (!isConnected || isMuted) {
-      setAudioLevel(0)
-      return
-    }
-
-    // Use real audio level from AudioManager
-    const interval = setInterval(() => {
-      const level = audioManager.getVolumeLevel()
-      setAudioLevel(level)
-    }, 100)
-
-    return () => clearInterval(interval)
-  }, [isConnected, isMuted])
-
-  const handleConnect = async () => {
-    if (!roomId) return
-    
-    setIsConnecting(true)
-    try {
-      // Initialize audio system
-      await audioManager.initialize()
-      
-      // Get user's audio stream
-      await audioManager.getUserAudioStream()
-      
-      // Ensure we have a local audio stream before creating WebRTC connection
-      const localStream = audioManager.getLocalStream()
-      if (!localStream) {
-        throw new Error('Failed to obtain local audio stream')
-      }
-      
-      console.log('✅ Local audio stream ready')
-      
-      // Join room through signaling server
-      if (signalingClientRef.current) {
-        signalingClientRef.current.joinRoom(roomId, nickname)
-      } else {
-        throw new Error('Signaling client not connected')
-      }
-      
-      // Connection successful
-      setIsConnected(true)
-      toast.success('Connected to room')
-    } catch (error) {
-      console.error('Connection failed:', error)
-      
-      // Provide more specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes('audio stream')) {
-          toast.error('Failed to access microphone. Please allow microphone access and try again.')
-        } else if (error.message.includes('WebRTC')) {
-          toast.error('Failed to establish connection. Please check your network and try again.')
-        } else {
-          toast.error(`Connection failed: ${error.message}`)
-        }
-      } else {
-        toast.error('Failed to connect, please try again')
-      }
-    } finally {
-      setIsConnecting(false)
-    }
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+  }
+  
+  const joinCall = () => {
+    setIsLoading(true)
+    setTimeout(() => {
+      setIsInCall(true)
+      setIsLoading(false)
+      toast.success('Joined voice chat!')
+    }, 1500)
+  }
+  
+  const leaveCall = () => {
+    setIsInCall(false)
+    toast.info('Left voice chat')
   }
 
-  const handleDisconnect = () => {
-    setIsConnected(false)
-    setParticipants([])
-    audioManager.cleanup()
-    
-    // Leave room through signaling server
-    if (signalingClientRef.current) {
-      signalingClientRef.current.leaveRoom()
-    }
-    
-    // Cleanup WebRTC connections
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.closeAllConnections()
-    }
-    
-    navigate('/')
+  const sendMessage = () => {
+    if (!newMessage.trim()) return
+    setMessages([...messages, {
+      id: Date.now().toString(),
+      senderId: 'me',
+      senderName: 'You',
+      content: newMessage,
+    }])
+    setNewMessage('')
   }
 
-  const toggleMute = async () => {
-    try {
-      await audioManager.toggleMute()
-      const newMutedState = !isMuted
-      setIsMuted(newMutedState)
-      
-      // Broadcast mute status through WebRTC
-      if (webrtcManagerRef.current) {
-        webrtcManagerRef.current.broadcastMuteStatus(newMutedState)
-      }
-      
-      // Update participant status
-      setParticipants(prev => 
-        prev.map(p => 
-          p.id === 'self' ? { ...p, isMuted: newMutedState } : p
-        )
-      )
-      
-      toast.success(newMutedState ? 'Microphone muted' : 'Microphone unmuted')
-    } catch (error) {
-      console.error('Failed to toggle mute:', error)
-      toast.error('Operation failed')
-    }
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') sendMessage()
   }
 
-  const copyRoomLink = async () => {
-    try {
-      await navigator.clipboard.writeText(roomUrl)
-      toast.success('Room link copied')
-    } catch (error) {
-      console.error('Copy failed:', error)
-      toast.error('Copy failed')
-    }
+  const copyRoomLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`)
+    toast.success('Link copied!')
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 overflow-hidden">
-      {/* Header - Fixed height */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm flex-shrink-0">
-        <div className="px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-xs sm:text-sm">S</span>
-                </div>
-                <span className="text-lg sm:text-xl font-semibold text-white">SuaraBelajar</span>
-              </Link>
-              
-              <div className="hidden sm:flex items-center space-x-2">
-                <span className="text-white/70 text-sm">Room:</span>
-                <code className="text-xs sm:text-sm bg-white/10 text-white px-2 py-1 rounded">
-                  {roomId?.substring(0, 8)}...
-                </code>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Badge 
-                variant={isConnected ? "default" : "secondary"} 
-                className="bg-blue-500/20 text-blue-300 border-blue-400/30 text-xs sm:text-sm"
-              >
-                {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Disconnected'}
-              </Badge>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyRoomLink}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs sm:text-sm px-2 sm:px-3"
-              >
-                <Copy className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Copy Link</span>
-                <span className="sm:hidden">Copy</span>
-              </Button>
-            </div>
+    <div className="h-screen flex bg-slate-900">
+      <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col hidden xl:flex">
+        <div className="p-4 border-b border-slate-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-white">Participants</h2>
+            <Badge variant="secondary" className="bg-slate-700 text-slate-300">
+              {participants.length + (isInCall ? 1 : 0)}
+            </Badge>
           </div>
+          <Button variant="outline" size="sm" className="w-full border-slate-600 text-slate-300 hover:bg-slate-700">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite
+          </Button>
         </div>
-      </header>
-
-      {/* Main Content - Fill remaining space */}
-      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 overflow-hidden">
-        <div className="w-full max-w-4xl">
-          
-          {/* Connection Status */}
-          {!isConnected && (
-            <div className="text-center">
-              <div className="mb-6 sm:mb-8">
-                {isConnecting ? (
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                ) : (
-                  <Users className="w-10 h-10 sm:w-12 sm:h-12 text-white/60 mx-auto mb-4" />
-                )}
+        
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {isInCall && (
+            <div className="flex items-center justify-between p-2 rounded-lg bg-green-500/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                  <Mic className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-white">You</p>
+                </div>
               </div>
-              
-              <h2 className="text-2xl sm:text-3xl font-semibold mb-2 text-white">
-                {isConnecting ? 'Connecting to room...' : 'Ready to join room'}
-              </h2>
-              
-              <p className="text-white/70 mb-6 sm:mb-8 text-sm sm:text-base">
-                {isConnecting 
-                  ? 'Establishing P2P connection, please wait...' 
-                  : 'Click the button below to start voice chat'
-                }
-              </p>
-              
-              {!isConnecting && (
-                <Button 
-                  onClick={handleConnect} 
-                  size="lg" 
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 sm:px-8 py-2 sm:py-3"
-                >
-                  <Mic className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  Join Voice Chat
-                </Button>
-              )}
+              {isMuted && <MicOff className="w-4 h-4 text-red-400" />}
             </div>
           )}
-
-          {/* Connected State - Voice Sphere */}
-          {isConnected && (
-            <div className="flex flex-col items-center justify-center h-full">
-              {/* Voice Visualization - Responsive size */}
-              <div className="mb-4 sm:mb-6 lg:mb-8">
-                <VoiceOrb 
-                  isActive={isConnected} 
-                  isMuted={isMuted}
-                  audioLevel={audioLevel}
-                  size={200} // Will be handled responsively in the component
-                />
-              </div>
-
-              {/* Participants count */}
-              <div className="mb-4 sm:mb-6 lg:mb-8">
-                <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-3 sm:px-4 py-1.5 sm:py-2">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 text-white/70" />
-                  <span className="text-white/90 text-xs sm:text-sm font-medium">
-                    {participants.length} participant{participants.length !== 1 ? 's' : ''}
+          
+          {participants.filter(p => p.id !== 'me').map(p => (
+            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-700/50">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-medium">
+                    {p.nickname.charAt(0)}
                   </span>
                 </div>
+                <div>
+                  <p className="text-sm text-white">{p.nickname}</p>
+                </div>
               </div>
+              {p.isMuted && <MicOff className="w-4 h-4 text-slate-500" />}
+            </div>
+          ))}
+        </div>
 
-              {/* Control Buttons - Responsive */}
-              <div className="flex justify-center items-center space-x-6 sm:space-x-8">
+        <div className="p-4 border-t border-slate-700">
+          <Button variant="ghost" size="sm" className="w-full text-slate-400 hover:text-white hover:bg-slate-700">
+            <Settings className="w-4 h-4 mr-2" />
+            Room Settings
+          </Button>
+        </div>
+      </aside>
+
+      <main className="flex-1 flex flex-col">
+        <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4">
+          <div className="flex items-center space-x-3">
+            <Link to="/" className="p-2 hover:bg-slate-700 rounded-lg">
+              <ArrowLeft className="w-5 h-5 text-slate-400" />
+            </Link>
+            <div>
+              <h1 className="text-white font-semibold">English Free Talk</h1>
+              <p className="text-xs text-slate-400">Room: {roomId?.slice(0, 8)}...</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Badge className={`${isInCall ? 'bg-green-500' : 'bg-slate-600'} text-white`}>
+              {isInCall ? 'In Call' : 'Not in call'}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={copyRoomLink} className="border-slate-600 text-slate-300">
+              <Copy className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowChat(!showChat)}
+              className={`${showChat ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+            >
+              <MessageSquare className="w-5 h-5" />
+            </Button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          {isLoading ? (
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
+              <p className="text-white">Connecting to voice chat...</p>
+            </div>
+          ) : !isInCall ? (
+            <div className="text-center">
+              <div className="w-24 h-24 mx-auto mb-6 bg-slate-700 rounded-full flex items-center justify-center">
+                <Mic className="w-12 h-12 text-slate-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Ready to talk?</h2>
+              <p className="text-slate-400 mb-6">Join voice chat to practice speaking</p>
+              <Button onClick={joinCall} size="lg" className="bg-green-500 hover:bg-green-600 text-white px-8">
+                <Phone className="w-5 h-5 mr-2" />
+                Join Voice Chat
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center animate-pulse">
+                <Mic className="w-16 h-16 text-white" />
+              </div>
+              <p className="text-white mb-6">You're in the call</p>
+              
+              <div className="flex justify-center space-x-4">
                 <Button
                   onClick={toggleMute}
                   size="lg"
-                  className={`w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 rounded-full transition-all duration-200 ${
+                  className={`w-16 h-16 rounded-full ${
                     isMuted 
-                      ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25' 
-                      : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/25'
-                  } text-white border-0`}
+                      ? 'bg-red-500 hover:bg-red-600' 
+                      : 'bg-slate-600 hover:bg-slate-500'
+                  } text-white`}
                 >
-                  {isMuted ? (
-                    <MicOff 
-                      className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8" 
-                      style={{ minWidth: '24px', minHeight: '24px' }}
-                    />
-                  ) : (
-                    <Mic 
-                      className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8" 
-                      style={{ minWidth: '24px', minHeight: '24px' }}
-                    />
-                  )}
+                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                 </Button>
-
+                
                 <Button
-                  onClick={handleDisconnect}
+                  onClick={leaveCall}
                   size="lg"
-                  className="w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 rounded-full bg-gray-600 hover:bg-gray-700 text-white border-0 shadow-lg shadow-gray-600/25 transition-all duration-200"
+                  className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white"
                 >
-                  <PhoneOff 
-                    className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8" 
-                    style={{ minWidth: '24px', minHeight: '24px' }}
-                  />
+                  <PhoneOff className="w-6 h-6" />
                 </Button>
               </div>
-
-              {/* Status text */}
-              <div className="mt-4 sm:mt-6">
-                <p className="text-white/60 text-xs sm:text-sm">
-                  {isMuted ? 'Microphone is muted' : 'Microphone is active'}
-                </p>
-              </div>
+              
+              <p className="text-slate-500 text-sm mt-4">
+                {isMuted ? 'You are muted' : 'Microphone on'}
+              </p>
             </div>
           )}
         </div>
       </main>
+
+      {showChat && (
+        <aside className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col">
+          <div className="h-14 border-b border-slate-700 flex items-center justify-between px-4">
+            <h2 className="font-semibold text-white">Chat</h2>
+            <Button variant="ghost" size="sm" onClick={() => setShowChat(false)}>
+              <X className="w-4 h-4 text-slate-400" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.map(msg => (
+              <div key={msg.id} className={`text-sm ${msg.senderId === 'me' ? 'text-right' : ''}`}>
+                <div className={`inline-block max-w-[85%] p-2 rounded-lg ${
+                  msg.senderId === 'me' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-slate-700 text-white'
+                }`}>
+                  <p className="text-xs opacity-70 mb-1">{msg.senderName}</p>
+                  <p>{msg.content}</p>
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-3 border-t border-slate-700">
+            <div className="flex space-x-2">
+              <Input
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
+              />
+              <Button onClick={sendMessage} size="icon" className="bg-blue-500 hover:bg-blue-600">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }
