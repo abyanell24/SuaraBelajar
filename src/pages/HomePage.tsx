@@ -120,9 +120,9 @@ export function HomePage() {
               <Mic className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Wiggle</h1>
+          <h1 className="text-3xl font-bold tracking-tight">SuaraBelajar</h1>
           <p className="text-muted-foreground">
-            Decentralized voice chat for everyone
+            Ruang Latihan Bahasa Inggris Gratis
           </p>
         </div>
 

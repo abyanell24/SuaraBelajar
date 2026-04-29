@@ -34,7 +34,7 @@ import { initializeP2PNode } from './lib/p2p/node'
       try {
         const message = new TextEncoder().encode(JSON.stringify({
           type: 'test',
-          content: 'Hello from Wiggle!',
+          content: 'Hello from SuaraBelajar!',
           timestamp: Date.now()
         }))
         await node.services.pubsub.publish(testTopic, message)

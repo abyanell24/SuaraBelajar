@@ -1,4 +1,4 @@
-# 🚀 Wiggle One-Click Deployment Guide
+# 🚀 SuaraBelajar Deployment Guide
 
 This project supports one-click deployment to multiple platforms. Choose the platform that best suits your needs:
 
@@ -8,18 +8,14 @@ This project supports one-click deployment to multiple platforms. Choose the pla
 
 | Platform | Deploy Button | Description |
 |----------|---------------|-------------|
-| **Vercel** | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Yooi/Wiggle) | Fastest deployment, automatic CI/CD |
-| **Netlify** | [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/Yooi/Wiggle) | User-friendly, global CDN acceleration |
-| **Zeabur** | [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/LWSTGM?referralCode=Yooi) | China-friendly access |
-| **Railway** | [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/XXXXXX) | Container-based deployment |
+| **Vercel** | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Yooi/SuaraBelajar) | Fastest deployment, automatic CI/CD |
+| **Netlify** | [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository-url=https://github.com/Yooi/SuaraBelajar) | User-friendly, global CDN acceleration |
 
 ### 🟡 Option 2: Online Development Environments
 
 | Platform | Open Button | Description |
 |----------|-------------|-------------|
-| **Gitpod** | [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Yooi/Wiggle) | Cloud-based VS Code |
-| **CodeSandbox** | [![Open in CodeSandbox](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/github/Yooi/Wiggle) | Online editor |
-| **StackBlitz** | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/Yooi/Wiggle) | Quick preview |
+| **Gitpod** | [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Yooi/SuaraBelajar) | Cloud-based VS Code |
 
 ---
 

@@ -98,7 +98,7 @@ export function WiggleApp() {
       callId: callId || 'test',
       peerId: p2pNode?.peerId.toString() || '',
       nickname: nickname || 'Anonymous',
-      data: { test: 'Hello from Wiggle!' }
+      data: { test: 'Hello from SuaraBelajar!' }
     })
   }
 
