@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import Wave1App from './wave1/Wave1App'
 import './index.css'
 import { Toaster } from 'sonner'
 import { initializeP2PNode } from './lib/p2p/node'
@@ -54,9 +55,11 @@ import { initializeP2PNode } from './lib/p2p/node'
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
+const wave1Mode = location.pathname.startsWith('/wave1') || new URLSearchParams(window.location.search).get('wave1') === 'true'
+const AppToRender = wave1Mode ? Wave1App : App
 root.render(
   React.createElement(React.StrictMode, null,
-    React.createElement(App),
+    React.createElement(AppToRender),
     React.createElement(Toaster, {
       position: "top-right",
       richColors: true,
