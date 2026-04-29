@@ -368,9 +368,9 @@ export default function Room() {
             <div className="flex items-center space-x-2 sm:space-x-4">
               <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-xs sm:text-sm">W</span>
+                  <span className="text-white font-bold text-xs sm:text-sm">S</span>
                 </div>
-                <span className="text-lg sm:text-xl font-semibold text-white">Wiggle</span>
+                <span className="text-lg sm:text-xl font-semibold text-white">SuaraBelajar</span>
               </Link>
               
               <div className="hidden sm:flex items-center space-x-2">

@@ -1,9 +1,7 @@
-# Wiggle - Decentralized Voice Chat Application
+# SuaraBelajar - Ruang Latihan Bahasa Inggris Gratis
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Yooi/Wiggle)
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/Yooi/Wiggle)
-[![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/LWSTGM?referralCode=Yooi)
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Yooi/Wiggle)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Yooi/SuaraBelajar)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/Yooi/SuaraBelajar)
 
 ## 🚀 Quick Deploy
 
@@ -11,8 +9,6 @@ Choose your preferred platform for one-click deployment:
 
 - **Vercel**: Click the button above for automatic deployment to Vercel
 - **Netlify**: Simple and user-friendly with global CDN acceleration
-- **Zeabur**: China-friendly access with fast deployment
-- **GitHub Pages**: Automatic CI/CD with free hosting
 
 📖 **Detailed Deployment Guide**: [DEPLOY.md](./DEPLOY.md)
 
@@ -25,7 +21,7 @@ Choose your preferred platform for one-click deployment:
 
 ## Overview
 
-Wiggle is a modern decentralized voice chat application built with React + TypeScript, featuring a beautiful ChatGPT-style interface with an innovative liquid voice orb visualization. The goal is to enable peer-to-peer voice communication without relying on centralized servers.
+SuaraBelajar adalah ruang latihan berbicara bahasa Inggris yang nyaman, mudah diakses, dan berbasis komunitas di Indonesia. Latihan bahasa Inggris tanpa biaya dengan teman belajar dari seluruh Indonesia.
 
 ## ✨ Current Status
 

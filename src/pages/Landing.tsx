@@ -49,9 +49,9 @@ export default function Landing() {
       <header className="flex justify-between items-center p-6">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-foreground rounded-lg flex items-center justify-center">
-            <span className="text-background font-bold text-sm">W</span>
+            <span className="text-background font-bold text-sm">S</span>
           </div>
-          <span className="text-xl font-semibold">Wiggle</span>
+          <span className="text-xl font-semibold">SuaraBelajar</span>
         </div>
         
         <a
@@ -71,10 +71,10 @@ export default function Landing() {
           {/* Title and Description */}
           <div className="text-center space-y-3">
             <h1 className="text-3xl font-bold tracking-tight">
-              Voice Chat
+              SuaraBelajar
             </h1>
             <p className="text-muted-foreground">
-              P2P encrypted voice calls
+              Ruang Latihan Bahasa Inggris Gratis
             </p>
           </div>
 
