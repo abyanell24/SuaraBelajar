@@ -18,39 +18,18 @@ import {
 } from 'lucide-react'
 import { useParams, Link } from 'react-router-dom'
 import { toast } from 'sonner'
-
-interface Participant {
-  id: string
-  nickname: string
-  isMuted: boolean
-}
-
-interface ChatMessage {
-  id: string
-  senderId: string
-  senderName: string
-  content: string
-}
-
-const DEMO_PARTICIPANTS: Participant[] = [
-  { id: 'demo1', nickname: 'John 🇺🇸', isMuted: false },
-  { id: 'demo2', nickname: 'Mas印尼', isMuted: false },
-]
-
-const DEMO_MESSAGES: ChatMessage[] = [
-  { id: '1', senderId: 'demo1', senderName: 'John 🇺🇸', content: 'Hello! 👋' },
-  { id: '2', senderId: 'demo2', senderName: 'Mas印尼', content: 'Hi all! Ready to practice?' },
-]
+import { voiceChatService, type ChatMessage, type ConnectionState, type RoomParticipant } from '@/lib/VoiceChatService'
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>()
   
   const [isMuted, setIsMuted] = useState(false)
   const [showChat, setShowChat] = useState(true)
-  const [participants, setParticipants] = useState<Participant[]>(DEMO_PARTICIPANTS)
-  const [messages, setMessages] = useState<ChatMessage[]>(DEMO_MESSAGES)
+  const [participants, setParticipants] = useState<RoomParticipant[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isInCall, setIsInCall] = useState(false)
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -58,31 +37,59 @@ export default function Room() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted)
-  }
-  
-  const joinCall = () => {
-    setIsLoading(true)
-    setTimeout(() => {
-      setIsInCall(true)
+  useEffect(() => {
+    voiceChatService.onConnectionState((state) => {
+      setConnectionState(state)
+      setIsInCall(state === 'connected')
       setIsLoading(false)
-      toast.success('Joined voice chat!')
-    }, 1500)
+    })
+
+    voiceChatService.onChatMessage((message) => {
+      setMessages(prev => [...prev, message])
+    })
+
+    voiceChatService.onParticipants((parts) => {
+      setParticipants(parts)
+    })
+
+    voiceChatService.onError((error) => {
+      toast.error(error)
+      setIsLoading(false)
+    })
+  }, [])
+
+  const toggleMute = async () => {
+    const newMuted = await voiceChatService.toggleMute()
+    setIsMuted(newMuted)
   }
   
-  const leaveCall = () => {
+  const joinCall = async () => {
+    setIsLoading(true)
+    try {
+      const nickname = `User${Math.floor(Math.random() * 1000)}`
+      await voiceChatService.joinRoom(roomId || 'default', nickname)
+      toast.success('Joined room!')
+    } catch (error) {
+      toast.error('Failed to join')
+      setIsLoading(false)
+    }
+  }
+  
+  const leaveCall = async () => {
+    await voiceChatService.leaveRoom()
     setIsInCall(false)
-    toast.info('Left voice chat')
+    toast.info('Left room')
   }
 
   const sendMessage = () => {
     if (!newMessage.trim()) return
+    voiceChatService.sendChatMessage(newMessage)
     setMessages([...messages, {
       id: Date.now().toString(),
       senderId: 'me',
       senderName: 'You',
       content: newMessage,
+      timestamp: new Date()
     }])
     setNewMessage('')
   }
@@ -165,8 +172,12 @@ export default function Room() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Badge className={`${isInCall ? 'bg-green-500' : 'bg-slate-600'} text-white`}>
-              {isInCall ? 'In Call' : 'Not in call'}
+            <Badge className={`${
+              connectionState === 'connected' ? 'bg-green-500' : 
+              connectionState === 'connecting' ? 'bg-yellow-500' : 'bg-slate-600'
+            } text-white`}>
+              {connectionState === 'connected' ? 'Connected' : 
+               connectionState === 'connecting' ? 'Connecting...' : 'Not in call'}
             </Badge>
             <Button variant="outline" size="sm" onClick={copyRoomLink} className="border-slate-600 text-slate-300">
               <Copy className="w-4 h-4" />

@@ -30,6 +30,7 @@ export class SignalingClient {
   private onParticipantJoinedHandler?: (participant: Participant) => void
   private onParticipantLeftHandler?: (participantId: string) => void
   private onSignalReceivedHandler?: (from: string, signal: any) => void
+  private onChatMessageHandler?: (message: { id: string; senderId: string; senderName: string; content: string; timestamp: Date }) => void
   private onExistingParticipantsHandler?: (participants: Participant[]) => void
   private onErrorHandler?: (error: string) => void
 
@@ -147,6 +148,16 @@ export class SignalingClient {
   }
 
   /**
+   * 发送聊天消息
+   */
+  sendChatMessage(message: { id: string; senderId: string; senderName: string; content: string; timestamp: number }) {
+    this.sendMessage({
+      type: 'chat-message',
+      ...message
+    })
+  }
+
+  /**
    * 发送消息到信令服务器
    */
   private sendMessage(message: SignalingMessage) {
@@ -193,6 +204,16 @@ export class SignalingClient {
 
       case 'signal':
         this.onSignalReceivedHandler?.(message.from, message.signal)
+        break
+
+      case 'chat-message':
+        this.onChatMessageHandler?.({
+          id: message.id,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          content: message.content,
+          timestamp: new Date(message.timestamp)
+        })
         break
 
       case 'error':
@@ -255,6 +276,10 @@ export class SignalingClient {
 
   onSignalReceived(handler: (from: string, signal: any) => void) {
     this.onSignalReceivedHandler = handler
+  }
+
+  onChatMessage(handler: (message: { id: string; senderId: string; senderName: string; content: string; timestamp: Date }) => void) {
+    this.onChatMessageHandler = handler
   }
 
   onExistingParticipants(handler: (participants: Participant[]) => void) {

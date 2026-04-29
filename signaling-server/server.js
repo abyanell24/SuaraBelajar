@@ -68,6 +68,9 @@ class SignalingServer {
       case 'signal':
         this.handleSignal(participantId, message);
         break;
+      case 'chat-message':
+        this.handleChatMessage(participantId, message);
+        break;
       default:
         console.warn(`⚠️ Unknown message type: ${message.type}`);
         this.sendError(participant.ws, `Unknown message type: ${message.type}`);
@@ -134,7 +137,7 @@ class SignalingServer {
     }
   }
 
-  handleLeaveRoom(participantId) {
+handleLeaveRoom(participantId) {
     const participant = this.participants.get(participantId);
     if (!participant || !participant.roomId) return;
 
@@ -144,29 +147,32 @@ class SignalingServer {
     if (room) {
       room.delete(participantId);
       
-      // Clean up empty room
       if (room.size === 0) {
         this.rooms.delete(roomId);
         console.log(`🏠 Room ${roomId} deleted (empty)`);
       } else {
-        // Notify remaining participants
         this.broadcastToRoom(roomId, {
           type: 'participant-left',
           participantId: participantId
         });
       }
     }
+  }
 
-    console.log(`👋 ${participantId} left room ${roomId}`);
-    
-    // Update participant info
-    participant.roomId = null;
+  handleChatMessage(participantId, message) {
+    const participant = this.participants.get(participantId);
+    if (!participant || !participant.roomId) return;
 
-    // Notify the participant they left
-    this.sendMessage(participant.ws, {
-      type: 'room-left',
-      roomId: roomId
-    });
+    const roomId = participant.roomId;
+
+    this.broadcastToRoom(roomId, {
+      type: 'chat-message',
+      id: message.id,
+      senderId: participantId,
+      senderName: participant.nickname,
+      content: message.content,
+      timestamp: message.timestamp
+    }, participantId);
   }
 
   handleSignal(participantId, message) {
