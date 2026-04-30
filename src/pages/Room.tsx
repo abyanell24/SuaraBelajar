@@ -42,6 +42,7 @@ export default function Room() {
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const processedMsgIds = useRef<Set<string>>(new Set())
   const [renderKey, setRenderKey] = useState(0)
   const [newMessage, setNewMessage] = useState('')
   const [isInCall, setIsInCall] = useState(false)
@@ -97,6 +98,13 @@ export default function Room() {
     const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
       const senderIdStr = String(msg.sender_id)
       const currentUserIdStr = String(currentUser?.id || '')
+      const msgId = String(msg.id)
+      
+      if (processedMsgIds.current.has(msgId)) {
+        console.log('Duplicate message skipped:', msgId)
+        return
+      }
+      processedMsgIds.current.add(msgId)
       
       console.log('New message received:', msg)
       console.log('Comparing sender_id:', senderIdStr, 'vs currentUserId:', currentUserIdStr)
@@ -107,7 +115,7 @@ export default function Room() {
       }
       
       const newMsg = {
-        id: msg.id,
+        id: msgId,
         senderId: senderIdStr,
         senderName: 'User',
         content: msg.content,
