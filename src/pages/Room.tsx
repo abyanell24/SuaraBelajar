@@ -95,29 +95,33 @@ export default function Room() {
       .catch(err => console.error('Failed to load messages:', err))
     
     const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
-      try {
-        console.log('New message received:', msg)
-        if (msg.sender_id === currentUser?.id) return
-        
-        const newMsg = {
-          id: msg.id,
-          senderId: msg.sender_id,
-          senderName: 'User',
-          content: msg.content,
-          timestamp: new Date(msg.created_at)
-        }
-        console.log('Adding new message:', newMsg)
-        
-        setMessages((prev: ChatMessage[]) => {
-          console.log('Prev messages:', prev.length, 'New:', newMsg.content)
-          const updated = [...prev, newMsg]
-          console.log('Updated messages:', updated.length)
-          return updated
-        })
-        setRenderKey((k: number) => k + 1)
-      } catch (err) {
-        console.error('Error in subscription:', err)
+      const senderIdStr = String(msg.sender_id)
+      const currentUserIdStr = String(currentUser?.id || '')
+      
+      console.log('New message received:', msg)
+      console.log('Comparing sender_id:', senderIdStr, 'vs currentUserId:', currentUserIdStr)
+      
+      if (senderIdStr === currentUserIdStr) {
+        console.log('Skipping own message')
+        return
       }
+      
+      const newMsg = {
+        id: msg.id,
+        senderId: senderIdStr,
+        senderName: 'User',
+        content: msg.content,
+        timestamp: new Date(msg.created_at)
+      }
+      console.log('Adding new message:', newMsg)
+      
+      setMessages((prev: ChatMessage[]) => {
+        console.log('Prev messages:', prev.length, 'New:', newMsg.content)
+        const updated = [...prev, newMsg]
+        console.log('Updated messages:', updated.length)
+        return updated
+      })
+      setRenderKey((k: number) => k + 1)
     })
     
     return () => {
