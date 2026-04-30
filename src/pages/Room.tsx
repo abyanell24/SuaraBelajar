@@ -41,7 +41,7 @@ export default function Room() {
   const [showChat, setShowChat] = useState(true)
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const messagesRef = useRef<ChatMessage[]>([])
   const [, forceUpdate] = useState(0)
   const processedMsgIds = useRef<Set<string>>(new Set())
   const [newMessage, setNewMessage] = useState('')
@@ -57,7 +57,7 @@ export default function Room() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messagesRef.current])
 
   useEffect(() => {
     authService.getCurrentUser()
@@ -90,7 +90,8 @@ export default function Room() {
             content: m.content,
             timestamp: new Date(m.created_at)
           }))
-          setMessages(formatted)
+          messagesRef.current = formatted
+          forceUpdate(n => n + 1)
         }
       })
       .catch(err => console.error('Failed to load messages:', err))
@@ -115,12 +116,8 @@ export default function Room() {
       }
       console.log('Adding new message:', newMsg)
       
-      setMessages((prev: ChatMessage[]) => {
-          console.log('Prev messages:', prev.length, 'New:', newMsg.content)
-          const updated = [...prev, newMsg]
-          console.log('Updated messages:', updated.length)
-          return updated
-        })
+      messagesRef.current.push(newMsg)
+      console.log('Messages ref now has:', messagesRef.current.length)
       forceUpdate(n => n + 1)
     })
     
@@ -209,7 +206,8 @@ export default function Room() {
       content: content,
       timestamp: new Date()
     }
-    setMessages([...messages, localMsg])
+    messagesRef.current.push(localMsg)
+    forceUpdate(n => n + 1)
     setNewMessage('')
     
     try {
@@ -488,7 +486,7 @@ export default function Room() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.map((msg, idx) => (
+            {messagesRef.current.map((msg, idx) => (
               <div key={`${renderKey}-${idx}`} className={`text-sm ${msg.senderId === 'me' ? 'text-right' : ''}`}>
                 <div className={`inline-block max-w-[85%] p-2 rounded-lg ${
                   msg.senderId === 'me' 
