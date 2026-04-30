@@ -57,6 +57,7 @@
     "@types/simple-peer": "^9.11.8",
     "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@typescript-eslint/parser": "^8.41.0",
+    "@vercel/node": "^5.7.13",
     "@vitejs/plugin-react": "^5.0.2",
     "autoprefixer": "^10.4.21",
     "concurrently": "^7.6.0",

@@ -175,6 +175,12 @@ export default function Room() {
   const sendMessage = async () => {
     if (!newMessage.trim()) return
     
+    if (!currentUser) {
+      toast.error('Please login to send message')
+      navigate('/login')
+      return
+    }
+    
     const content = newMessage
     voiceChatService.sendChatMessage(content)
     
@@ -189,7 +195,9 @@ export default function Room() {
     setNewMessage('')
     
     try {
-      const userId = currentUser?.id || 'anonymous'
+      const userId = currentUser?.id
+    
+    try {
       await messageService.sendMessage(roomId || '', userId, content)
       console.log('Message saved, userId:', userId)
     } catch (err: any) {

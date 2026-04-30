@@ -5,7 +5,9 @@ const API_KEY = process.env.LIVEKIT_API_KEY || ''
 const API_SECRET = process.env.LIVEKIT_API_SECRET || ''
 const LIVEKIT_URL = process.env.LIVEKIT_URL || ''
 
-export default function handler(req, res) {
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+
+export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

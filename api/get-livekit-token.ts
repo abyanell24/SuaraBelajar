@@ -5,7 +5,9 @@ const API_KEY = 'API6jPMZTCMF3Np'
 const API_SECRET = 'xleGnH676c23jKiipfDgeBEAT2XWvCvMYQnYSWpvJQmA'
 const LIVEKIT_URL = 'wss://suarabelajar-gebnw4xt.livekit.cloud'
 
-export default function handler(req, res) {
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+
+export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
