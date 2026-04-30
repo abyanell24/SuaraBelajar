@@ -94,6 +94,7 @@ export default function Room() {
       .catch(err => console.error('Failed to load messages:', err))
     
     const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
+      console.log('New message received:', msg)
       if (msg.sender_id === currentUser?.id) return
       
       const newMsg = {
@@ -103,6 +104,7 @@ export default function Room() {
         content: msg.content,
         timestamp: new Date(msg.created_at)
       }
+      console.log('Adding new message:', newMsg)
       setMessages(prev => [...prev, newMsg])
     })
     
