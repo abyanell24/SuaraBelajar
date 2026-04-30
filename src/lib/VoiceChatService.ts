@@ -1,4 +1,4 @@
-import { SignalingClient } from './signaling/SignalingClient'
+import { Room, LocalAudioTrack, createLocalAudioTrack } from 'livekit-client'
 
 export interface RoomParticipant {
   id: string
@@ -19,12 +19,11 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected'
 type Callback<T> = (data: T) => void
 
 class VoiceChatService {
-  private client: SignalingClient | null = null
+  private room: Room | null = null
+  private localTrack: LocalAudioTrack | null = null
   private roomId: string = ''
-  private participantId: string = ''
   private nickname: string = ''
   private muted: boolean = false
-  private localStream: MediaStream | null = null
   
   private onConnectionStateCb?: Callback<ConnectionState>
   private onParticipantsCb?: Callback<RoomParticipant[]>
@@ -34,81 +33,118 @@ class VoiceChatService {
   async joinRoom(roomId: string, nickname: string): Promise<void> {
     this.roomId = roomId
     this.nickname = nickname
-    this.muted = false
     
     this.onConnectionStateCb?.('connecting')
     
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      console.log('Microphone access granted')
+      const token = await this.getTokenFromServer(roomId, nickname)
+      if (!token) throw new Error('Failed to get token')
       
-      this.client = new SignalingClient()
+      const room = new Room()
+      const url = import.meta.env.VITE_LIVEKIT_URL
       
-      this.client.onConnected(() => {
-        console.log('Connected to signaling')
+      await room.connect(url, token)
+      
+      this.room = room
+      
+      const track = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
       })
+      this.localTrack = track
       
-      this.client.onRoomJoined((roomId: string, participantId: string) => {
-        this.participantId = participantId
-        this.onConnectionStateCb?.('connected')
-      })
+      await room.localParticipant.publishTrack(track)
       
-      this.client.onParticipantJoined((participant: { participantId: string; nickname: string }) => {
-        console.log('Participant joined:', participant.nickname)
-      })
-      
-      this.client.onChatMessage((message: { id: string; senderId: string; senderName: string; content: string; timestamp: Date }) => {
-        this.onChatMessageCb?.(message)
-      })
-      
-      this.client.onError((error: string) => {
-        this.onErrorCb?.(error)
-      })
-      
-      await this.client.connect()
-      this.client.joinRoom(roomId, nickname)
+      this.onConnectionStateCb?.('connected')
+      console.log('Connected to LiveKit')
       
     } catch (error) {
-      console.error('Failed to join room:', error)
+      console.error('Failed to join:', error)
       this.onConnectionStateCb?.('disconnected')
-      this.onErrorCb?.('Failed to join room')
+      this.onErrorCb?.('Failed to join voice room')
     }
   }
 
-  async leaveRoom(): Promise<void> {
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop())
-      this.localStream = null
+  private async getTokenFromServer(roomId: string, nickname: string): Promise<string> {
+    const apiKey = import.meta.env.VITE_LIVEKIT_API_KEY
+    const apiSecret = import.meta.env.VITE_LIVEKIT_SECRET
+    
+    const now = Math.floor(Date.now() / 1000)
+    const exp = now + 3600
+    
+    const payload = {
+      sub: `${nickname}_${now}`,
+      name: nickname,
+      iss: apiKey,
+      room: roomId,
+      exp: exp,
+      aagg: { canPublish: true, canSubscribe: true }
     }
-    if (this.client) {
-      this.client.leaveRoom()
-      this.client.disconnect()
-      this.client = null
+    
+    const enc = new TextEncoder() 
+    const header = { alg: 'HS256', typ: 'JWT' }
+    
+    const headerStr = btoa(JSON.stringify(header))
+    const payloadStr = btoa(JSON.stringify(payload))
+    const signInput = `${headerStr}.${payloadStr}`
+    
+    const keyData = enc.encode(apiSecret)
+    const messageData = enc.encode(signInput)
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+    
+    const sigBuf = await crypto.subtle.sign('HMAC', cryptoKey, messageData)
+    const sigStr = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
+    
+    return `${headerStr}.${payloadStr}.${sigStr}`
+  }
+
+  sendChatMessage(content: string): void {
+    const msg: ChatMessage = {
+      id: Date.now().toString(),
+      senderId: 'me',
+      senderName: this.nickname,
+      content,
+      timestamp: new Date()
     }
-    this.onConnectionStateCb?.('disconnected')
+    this.onChatMessageCb?.(msg)
   }
 
   async toggleMute(): Promise<boolean> {
     this.muted = !this.muted
-    if (this.localStream) {
-      this.localStream.getAudioTracks().forEach(track => {
-        track.enabled = !this.muted
-      })
+    
+    if (this.localTrack) {
+      if (this.muted) {
+        this.localTrack.stop()
+      } else {
+        this.localTrack = await createLocalAudioTrack()
+        if (this.room) {
+          await this.room.localParticipant.publishTrack(this.localTrack)
+        }
+      }
     }
-    console.log('Muted:', this.muted)
+    
     return this.muted
   }
 
-  sendChatMessage(content: string): void {
-    if (!this.client || !this.participantId) return
+  async leaveRoom(): Promise<void> {
+    if (this.localTrack) {
+      this.localTrack.stop()
+      this.localTrack = null
+    }
     
-    this.client.sendChatMessage({
-      id: Date.now().toString(),
-      senderId: this.participantId,
-      senderName: this.nickname,
-      content,
-      timestamp: Date.now()
-    })
+    if (this.room) {
+      await this.room.disconnect()
+      this.room = null
+    }
+    
+    this.onConnectionStateCb?.('disconnected')
   }
 
   onConnectionState(callback: Callback<ConnectionState>): void {

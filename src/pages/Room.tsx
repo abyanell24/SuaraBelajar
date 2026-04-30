@@ -64,35 +64,52 @@ export default function Room() {
   }, [])
 
   useEffect(() => {
-    if (roomId) {
-      messageService.getMessages(roomId)
-        .then(async (msgs) => {
-          if (msgs && msgs.length > 0) {
-            const senderIds = [...new Set(msgs.map((m: any) => m.sender_id))]
-            const senderNames: Record<string, string> = {}
-            
-            for (const id of senderIds) {
-              try {
-                const profile = await profileService.getProfile(id)
-                senderNames[id] = profile?.nickname || 'User'
-              } catch {
-                senderNames[id] = 'User'
-              }
+    if (!roomId) return
+    
+    messageService.getMessages(roomId)
+      .then(async (msgs) => {
+        if (msgs && msgs.length > 0) {
+          const senderIds = [...new Set(msgs.map((m: any) => m.sender_id))]
+          const senderNames: Record<string, string> = {}
+          
+          for (const id of senderIds) {
+            try {
+              const profile = await profileService.getProfile(id)
+              senderNames[id] = profile?.nickname || 'User'
+            } catch {
+              senderNames[id] = 'User'
             }
-            
-            const formatted = msgs.map((m: any) => ({
-              id: m.id,
-              senderId: m.sender_id,
-              senderName: senderNames[m.sender_id] || 'User',
-              content: m.content,
-              timestamp: new Date(m.created_at)
-            }))
-            setMessages(formatted)
           }
-        })
-        .catch(err => console.error('Failed to load messages:', err))
+          
+          const formatted = msgs.map((m: any) => ({
+            id: m.id,
+            senderId: m.sender_id,
+            senderName: senderNames[m.sender_id] || 'User',
+            content: m.content,
+            timestamp: new Date(m.created_at)
+          }))
+          setMessages(formatted)
+        }
+      })
+      .catch(err => console.error('Failed to load messages:', err))
+    
+    const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
+      if (msg.sender_id === currentUser?.id) return
+      
+      const newMsg = {
+        id: msg.id,
+        senderId: msg.sender_id,
+        senderName: 'User',
+        content: msg.content,
+        timestamp: new Date(msg.created_at)
+      }
+      setMessages(prev => [...prev, newMsg])
+    })
+    
+    return () => {
+      channel.unsubscribe()
     }
-  }, [roomId])
+  }, [roomId, currentUser])
 
   useEffect(() => {
     if (roomId) {
@@ -287,17 +304,18 @@ export default function Room() {
                     className="h-7 bg-white/10 border-white/20 text-white text-sm mt-1"
                     placeholder="Description"
                   />
-                  <Button 
+<Button 
                     size="sm" 
                     onClick={async () => {
                       if (!editName.trim()) return
                       setSavingRoom(true)
                       try {
+                        const newDesc = editDesc.trim()
                         await roomService.updateRoom(roomId || '', { 
                           name: editName.trim(), 
-                          description: editDesc.trim() || null 
+                          description: newDesc 
                         })
-                        setRoomDetails({ ...roomDetails!, name: editName.trim(), description: editDesc.trim() || null })
+                        setRoomDetails({ ...roomDetails!, name: editName.trim(), description: newDesc })
                         setIsEditing(false)
                         toast.success('Room updated!')
                       } catch (err) {
@@ -391,7 +409,7 @@ export default function Room() {
               </div>
               <h2 className="text-xl font-semibold text-white mb-2">Ready to talk?</h2>
               <p className="text-slate-400 mb-6">Join voice chat to practice speaking</p>
-              <Button onClick={joinCall} size="lg" className="bg-green-500 hover:bg-green-600 text-white px-8">
+              <Button onClick={() => toast.info('Voice coming soon!')} size="lg" className="bg-green-500 hover:bg-green-600 text-white px-8">
                 <Phone className="w-5 h-5 mr-2" />
                 Join Voice Chat
               </Button>

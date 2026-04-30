@@ -55,7 +55,7 @@ import { initializeP2PNode } from './lib/p2p/node'
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
-const wave1Mode = location.pathname.startsWith('/wave1') || new URLSearchParams(window.location.search).get('wave1') === 'true'
+const wave1Mode = false
 const AppToRender = wave1Mode ? Wave1App : App
 root.render(
   React.createElement(React.StrictMode, null,
