@@ -42,8 +42,8 @@ export default function Room() {
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [, forceUpdate] = useState(0)
   const processedMsgIds = useRef<Set<string>>(new Set())
-  const [renderKey, setRenderKey] = useState(0)
   const [newMessage, setNewMessage] = useState('')
   const [isInCall, setIsInCall] = useState(false)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
@@ -57,7 +57,7 @@ export default function Room() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, renderKey])
+  }, [messages])
 
   useEffect(() => {
     authService.getCurrentUser()
@@ -121,9 +121,7 @@ export default function Room() {
           console.log('Updated messages:', updated.length)
           return updated
         })
-      setTimeout(() => {
-        setRenderKey((k: number) => k + 1)
-      }, 10)
+      forceUpdate(n => n + 1)
     })
     
     return () => {
@@ -489,7 +487,7 @@ export default function Room() {
             </Button>
           </div>
 
-          <div key={renderKey} className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((msg, idx) => (
               <div key={`${renderKey}-${idx}`} className={`text-sm ${msg.senderId === 'me' ? 'text-right' : ''}`}>
                 <div className={`inline-block max-w-[85%] p-2 rounded-lg ${
