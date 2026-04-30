@@ -106,7 +106,12 @@ export default function Room() {
         timestamp: new Date(msg.created_at)
       }
 console.log('Adding new message:', newMsg)
-      setMessages(prev => [...prev, newMsg])
+      setMessages(prev => {
+        console.log('Prev messages:', prev.length, 'New:', newMsg.content)
+        const updated = [...prev, newMsg]
+        console.log('Updated messages:', updated.length)
+        return updated
+      })
       setRenderKey(k => k + 1)
     })
     
