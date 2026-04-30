@@ -107,16 +107,7 @@ export default function Room() {
       console.log('Adding new message:', newMsg)
       
       // Force update
-      const currentMessages = [...messages, newMsg]
-      setMessages(currentMessages)
-      
-      // Force scroll to bottom
-      setTimeout(() => {
-        const container = document.querySelector('.overflow-y-auto')
-        if (container) {
-          container.scrollTop = container.scrollHeight
-        }
-      }, 100)
+setMessages(prev => [...prev, newMsg])
     })
     
     return () => {
