@@ -97,6 +97,8 @@ export default function Room() {
       .catch(err => console.error('Failed to load messages:', err))
     
     const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
+      console.log('CB invoked with:', msg)
+      
       const msgId = String(msg.id)
       
       if (processedMsgIds.current.has(msgId)) {
