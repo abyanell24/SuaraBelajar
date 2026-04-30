@@ -96,8 +96,6 @@ export default function Room() {
       .catch(err => console.error('Failed to load messages:', err))
     
     const channel = messageService.subscribeToMessages(roomId, (msg: any) => {
-      const senderIdStr = String(msg.sender_id)
-      const currentUserIdStr = String(currentUser?.id || '')
       const msgId = String(msg.id)
       
       if (processedMsgIds.current.has(msgId)) {
@@ -107,16 +105,10 @@ export default function Room() {
       processedMsgIds.current.add(msgId)
       
       console.log('New message received:', msg)
-      console.log('Comparing sender_id:', senderIdStr, 'vs currentUserId:', currentUserIdStr)
-      
-      if (senderIdStr === currentUserIdStr) {
-        console.log('Skipping own message')
-        return
-      }
       
       const newMsg = {
         id: msgId,
-        senderId: senderIdStr,
+        senderId: String(msg.sender_id),
         senderName: 'User',
         content: msg.content,
         timestamp: new Date(msg.created_at)
