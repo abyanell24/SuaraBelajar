@@ -56,7 +56,7 @@ export default function Room() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, renderKey])
 
   useEffect(() => {
     authService.getCurrentUser()
@@ -116,12 +116,14 @@ export default function Room() {
       console.log('Adding new message:', newMsg)
       
       setMessages((prev: ChatMessage[]) => {
-        console.log('Prev messages:', prev.length, 'New:', newMsg.content)
-        const updated = [...prev, newMsg]
-        console.log('Updated messages:', updated.length)
-        return updated
-      })
-      setRenderKey((k: number) => k + 1)
+          console.log('Prev messages:', prev.length, 'New:', newMsg.content)
+          const updated = [...prev, newMsg]
+          console.log('Updated messages:', updated.length)
+          return updated
+        })
+      setTimeout(() => {
+        setRenderKey((k: number) => k + 1)
+      }, 10)
     })
     
     return () => {
