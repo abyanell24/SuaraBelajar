@@ -84,8 +84,8 @@ export default function Room() {
           }
           
           const formatted = msgs.map((m: any) => ({
-            id: m.id,
-            senderId: m.sender_id,
+            id: String(m.id),
+            senderId: String(m.sender_id),
             senderName: senderNames[m.sender_id] || 'User',
             content: m.content,
             timestamp: new Date(m.created_at)
