@@ -105,7 +105,18 @@ export default function Room() {
         timestamp: new Date(msg.created_at)
       }
       console.log('Adding new message:', newMsg)
-      setMessages(prev => [...prev, newMsg])
+      
+      // Force update
+      const currentMessages = [...messages, newMsg]
+      setMessages(currentMessages)
+      
+      // Force scroll to bottom
+      setTimeout(() => {
+        const container = document.querySelector('.overflow-y-auto')
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      }, 100)
     })
     
     return () => {
