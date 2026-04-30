@@ -104,10 +104,9 @@ export default function Room() {
         content: msg.content,
         timestamp: new Date(msg.created_at)
       }
-      console.log('Adding new message:', newMsg)
-      
-      // Force update
-setMessages(prev => [...prev, newMsg])
+console.log('Adding new message:', newMsg)
+      setMessages(prev => [...prev, newMsg])
+      setMessages(prev => [...prev])
     })
     
     return () => {
