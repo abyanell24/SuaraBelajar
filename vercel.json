@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "wiggle",
+  "name": "suara-belajar",
   "builds": [
     {
       "src": "package.json",
@@ -8,32 +8,16 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "signaling-server/server.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    {
-      "src": "/api/ws",
-      "dest": "/signaling-server/server.js"
-    },
     {
       "src": "/(.*)",
       "dest": "/index.html"
     }
   ],
-  "functions": {
-    "signaling-server/server.js": {
-      "runtime": "@vercel/node@18"
-    }
-  },
-  "buildCommand": "npm run build:all",
+  "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "installCommand": "npm run install:all",
-  "framework": "vite",
-  "env": {
-    "NODE_ENV": "production"
-  }
+  "installCommand": "npm install",
+  "framework": "vite"
 }
