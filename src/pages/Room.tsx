@@ -196,8 +196,9 @@ export default function Room() {
     
     try {
       const userId = currentUser?.id
-    
-    try {
+      if (!userId) {
+        throw new Error('Not logged in')
+      }
       await messageService.sendMessage(roomId || '', userId, content)
       console.log('Message saved, userId:', userId)
     } catch (err: any) {
