@@ -119,7 +119,6 @@ export default function Room() {
         console.error('Error in subscription:', err)
       }
     })
-    })
     
     return () => {
       channel.unsubscribe()
