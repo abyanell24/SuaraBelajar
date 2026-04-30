@@ -42,6 +42,7 @@ export default function Room() {
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<RoomParticipant[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [renderKey, setRenderKey] = useState(0)
   const [newMessage, setNewMessage] = useState('')
   const [isInCall, setIsInCall] = useState(false)
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
@@ -106,7 +107,7 @@ export default function Room() {
       }
 console.log('Adding new message:', newMsg)
       setMessages(prev => [...prev, newMsg])
-      setMessages(prev => [...prev])
+      setRenderKey(k => k + 1)
     })
     
     return () => {
@@ -472,7 +473,7 @@ console.log('Adding new message:', newMsg)
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div key={renderKey} className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map(msg => (
               <div key={msg.id} className={`text-sm ${msg.senderId === 'me' ? 'text-right' : ''}`}>
                 <div className={`inline-block max-w-[85%] p-2 rounded-lg ${
